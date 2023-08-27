@@ -49,15 +49,16 @@ class RPAParser:
         }
 
         for user_data in insertion_data:
-            for attribute, value in user_data.items():
-                input_element = self.driver.find_element(
-                    By.XPATH, f'//input[@ng-reflect-name="{input_mapping[attribute]}"]'
-                )
-                input_element.send_keys(value)
-
+            self.insert_data(user_data, input_mapping)
             self.make_click_on_specific_element(submit_page_xpath)
 
         time.sleep(5)
+
+    def insert_data(self, user_data: Dict[str, str], input_mapping: Dict[str, str]):
+        for attribute, value in user_data.items():
+            user_data_element_xpath = f'//input[@ng-reflect-name="{input_mapping[attribute]}"]'
+            input_element = self.driver.find_element(By.XPATH, user_data_element_xpath)
+            input_element.send_keys(value)
 
     def downloads_path_checker(self) -> str:
         project_path = os.path.dirname(os.path.abspath(__file__))
