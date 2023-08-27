@@ -24,7 +24,7 @@ class RPAParser:
         element = self.driver.find_element(By.XPATH, xpath)
         element.click()
         if download_queue:
-            self.is_file_downloaded()
+            self.wait_for_data()
 
     def solve_challenge(self) -> None:
         download_button_xpath = '//a[@href="./assets/downloadFiles/challenge.xlsx"]'
@@ -70,10 +70,8 @@ class RPAParser:
 
         return downloads_folder
 
-    def is_file_downloaded(self) -> None:
-        while True:
-            if os.path.exists(os.path.join(self.DOWNLOADS_DIR, self.DATA_FILE_NAME)):
-                break
+    def wait_for_data(self) -> None:
+        while not os.path.exists(os.path.join(self.DOWNLOADS_DIR, self.DATA_FILE_NAME)):
             time.sleep(1)
 
     @staticmethod
