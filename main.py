@@ -27,8 +27,12 @@ class RPAParser:
             self.is_file_downloaded()
 
     def solve_challenge(self) -> None:
-        self.make_click_on_specific_element('//a[@href="./assets/downloadFiles/challenge.xlsx"]', download_queue=True)
-        self.make_click_on_specific_element('//button[contains(@class, "btn")]')
+        download_button_xpath = '//a[@href="./assets/downloadFiles/challenge.xlsx"]'
+        start_challenge_button_xpath = '//button[contains(@class, "btn")]'
+        submit_page_xpath = '//input[contains(@class, "btn")]'
+
+        self.make_click_on_specific_element(download_button_xpath, download_queue=True)
+        self.make_click_on_specific_element(start_challenge_button_xpath)
         insertion_data = self.parse_excel(self.DOWNLOADS_DIR, self.DATA_FILE_NAME)
 
         if insertion_data is None:
@@ -51,7 +55,7 @@ class RPAParser:
                 )
                 input_element.send_keys(value)
 
-            self.make_click_on_specific_element('//input[contains(@class, "btn")]')
+            self.make_click_on_specific_element(submit_page_xpath)
 
         time.sleep(5)
 
