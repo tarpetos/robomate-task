@@ -19,9 +19,6 @@ class RPAParser:
         self.chrome_options.add_experimental_option('prefs', self.prefs)
         self.driver = webdriver.Chrome(options=self.chrome_options)
         self.driver.get(self.PARSE_URL)
-        self.make_click_on_specific_element('//a[@href="./assets/downloadFiles/challenge.xlsx"]', download_queue=True)
-        self.make_click_on_specific_element('//button[contains(@class, "btn")]')
-        self.insertion_data = self.parse_excel(self.DOWNLOADS_DIR, self.DATA_FILE_NAME)
 
     def make_click_on_specific_element(self, xpath: str, download_queue: bool = False) -> None:
         element = self.driver.find_element(By.XPATH, xpath)
@@ -30,7 +27,11 @@ class RPAParser:
             self.is_file_downloaded()
 
     def solve_challenge(self) -> None:
-        if self.insertion_data is None:
+        self.make_click_on_specific_element('//a[@href="./assets/downloadFiles/challenge.xlsx"]', download_queue=True)
+        self.make_click_on_specific_element('//button[contains(@class, "btn")]')
+        insertion_data = self.parse_excel(self.DOWNLOADS_DIR, self.DATA_FILE_NAME)
+
+        if insertion_data is None:
             return
 
         input_mapping = {
@@ -43,7 +44,7 @@ class RPAParser:
             'Email': 'labelEmail'
         }
 
-        for user_data in self.insertion_data:
+        for user_data in insertion_data:
             for attribute, value in user_data.items():
                 input_element = self.driver.find_element(
                     By.XPATH, f'//input[@ng-reflect-name="{input_mapping[attribute]}"]'
