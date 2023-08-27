@@ -19,7 +19,7 @@ PARSE_URL = 'https://rpachallenge.com/'
 
 class Worker(ABC):
     @abstractmethod
-    def open_url(self) -> Any:
+    def open_url(self, driver: webdriver.Chrome) -> Any:
         pass
 
     @abstractmethod
@@ -28,16 +28,14 @@ class Worker(ABC):
 
 
 class XlsxHandler(Worker):
-    def __init__(self, driver: webdriver.Chrome):
-        self.driver = driver
 
-    def open_url(self):
+    def open_url(self, driver: webdriver.Chrome):
         download_button_xpath = '//a[@href="./assets/downloadFiles/challenge.xlsx"]'
-        element = self.driver.find_element(By.XPATH, download_button_xpath)
+        element = driver.find_element(By.XPATH, download_button_xpath)
         element.click()
         self.wait_for_data()
 
-    def do_action(self) -> List[Dict[str, str]] | None:
+    def do_action(self, *args) -> List[Dict[str, str]] | None:
         file_path = os.path.join(DOWNLOADS_DIR, DATA_FILE_NAME)
         result_dict = None
 
@@ -53,29 +51,13 @@ class XlsxHandler(Worker):
 
     @staticmethod
     def wait_for_data() -> None:
-        seconds = 0
-        timeout = 10
-        while not os.path.exists(os.path.join(DOWNLOADS_DIR, DATA_FILE_NAME)) and seconds < timeout:
-            time.sleep(1)
-            seconds += 1
+        while not os.path.exists(os.path.join(DOWNLOADS_DIR, DATA_FILE_NAME)):
+            time.sleep(2)
 
 
 class FormFiller(Worker):
-    def __init__(self, driver: webdriver.Chrome):
-        self.driver = driver
-
-    def open_url(self):
-        start_challenge_button_xpath = '//button[contains(@class, "btn")]'
-        element = self.driver.find_element(By.XPATH, start_challenge_button_xpath)
-        element.click()
-
-    def do_action(self, insertion_data: List[Dict[str, str]], form_apply_count: int):
-        if insertion_data is None:
-            return
-
-        submit_page_xpath = '//input[contains(@class, "btn")]'
-
-        input_mapping = {
+    def __init__(self):
+        self.input_mapping = {
             'Address': 'labelAddress',
             'Company Name': 'labelCompanyName',
             'Phone Number': 'labelPhone',
@@ -85,33 +67,52 @@ class FormFiller(Worker):
             'Email': 'labelEmail'
         }
 
+    def open_url(self, driver: webdriver.Chrome) -> None:
+        start_challenge_button_xpath = '//button[contains(@class, "btn")]'
+        element = driver.find_element(By.XPATH, start_challenge_button_xpath)
+        element.click()
+
+    def do_action(self, insertion_data: List[Dict[str, str]], form_apply_count: int, driver: webdriver.Chrome) -> None:
+        if insertion_data is None:
+            return
+
+        submit_page_xpath = '//input[contains(@class, "btn")]'
         for counter, user_data in enumerate(insertion_data, 1):
             counter_check = self.apply_counter_check(counter, form_apply_count, len(insertion_data))
-            if counter_check != 0:
+            if counter_check is None:
                 return
 
-            self.insert_data(user_data, input_mapping)
-            element = self.driver.find_element(By.XPATH, submit_page_xpath)
+            self.insert_data(user_data, self.input_mapping, driver)
+            element = driver.find_element(By.XPATH, submit_page_xpath)
             element.click()
 
-    def insert_data(self, user_data: Dict[str, str], input_mapping: Dict[str, str]):
+    @staticmethod
+    def insert_data(user_data: Dict[str, str], input_mapping: Dict[str, str], driver: webdriver.Chrome) -> None:
         for attribute, value in user_data.items():
             user_data_element_xpath = f'//input[@ng-reflect-name="{input_mapping[attribute]}"]'
-            input_element = self.driver.find_element(By.XPATH, user_data_element_xpath)
+            input_element = driver.find_element(By.XPATH, user_data_element_xpath)
             input_element.send_keys(value)
 
     @staticmethod
-    def apply_counter_check(loop_counter: int, form_apply_count: int, max_counter_value: int) -> int:
+    def apply_counter_check(loop_counter: int, form_apply_count: int, max_counter_value: int) -> None | str:
         if form_apply_count < 0 or form_apply_count > max_counter_value:
-            # time.sleep(5)
-            print(f'Form cannot be filled. Invalid input!')
-            return -1
+            logger.info(msg='Form cannot be filled. Invalid input!')
         elif form_apply_count == loop_counter - 1:
-            # time.sleep(5)
-            print(f'Form was filled successfully {loop_counter - 1} time (s)!')
-            return -2
+            logger.info(msg=f'Form was filled successfully {loop_counter - 1} time (s)!')
         else:
-            return 0
+            return 'Loop continues'
+
+
+class Runner:
+    def __init__(self, driver: webdriver.Chrome):
+        self.driver = driver
+        self.driver.get(PARSE_URL)
+
+    def run(
+            self, worker: Any, insertion_data: Dict[str, str] | None = None, form_apply_count: int = 0
+    ) -> Dict[str, str] | None:
+        worker.open_url(driver=self.driver)
+        return worker.do_action(insertion_data, form_apply_count, self.driver)
 
 
 def downloads_path_checker() -> str:
@@ -125,20 +126,18 @@ def downloads_path_checker() -> str:
     return downloads_folder
 
 
-def main():
+def main() -> None:
     chrome_options = webdriver.ChromeOptions()
     prefs = {'download.default_directory': downloads_path_checker()}
     chrome_options.add_experimental_option('prefs', prefs)
     driver = webdriver.Chrome(options=chrome_options)
-    driver.get(PARSE_URL)
 
-    xlsx_worker = XlsxHandler(driver)
-    xlsx_worker.open_url()
-    data = xlsx_worker.do_action()
+    runner = Runner(driver)
+    xlsx_worker = XlsxHandler()
+    form_worker = FormFiller()
 
-    form_worker = FormFiller(driver)
-    form_worker.open_url()
-    form_worker.do_action(data, 5)
+    data = runner.run(xlsx_worker)
+    runner.run(form_worker, insertion_data=data, form_apply_count=5)
 
 
 if __name__ == '__main__':
