@@ -12,7 +12,7 @@ This program automates the solution for the RPA Challenge using the Selenium Web
 
 ## Requirements
 
-- Python (>=3.6)
+- Python 3.11
 - Selenium WebDriver
 - Chrome WebDriver (for Chrome browser automation)
 
