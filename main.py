@@ -1,42 +1,79 @@
+import logging
 import os
 import time
-from typing import List, Dict
+from abc import ABC, abstractmethod
+from typing import List, Dict, Any
 
 import pandas as pd
 
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-class RPAParser:
-    DOWNLOADS_DIR = 'downloads'
-    DATA_FILE_NAME = 'challenge.xlsx'
-    PARSE_URL = 'https://rpachallenge.com/'
+DOWNLOADS_DIR = 'downloads'
+DATA_FILE_NAME = 'challenge.xlsx'
+PARSE_URL = 'https://rpachallenge.com/'
 
-    def __init__(self):
-        self.chrome_options = webdriver.ChromeOptions()
-        self.prefs = {'download.default_directory': self.downloads_path_checker()}
-        self.chrome_options.add_experimental_option('prefs', self.prefs)
-        self.driver = webdriver.Chrome(options=self.chrome_options)
-        self.driver.get(self.PARSE_URL)
 
-    def make_click_on_specific_element(self, xpath: str, download_queue: bool = False) -> None:
-        element = self.driver.find_element(By.XPATH, xpath)
-        element.click()
-        if download_queue:
-            self.wait_for_data()
+class Worker(ABC):
+    @abstractmethod
+    def open_url(self) -> Any:
+        pass
 
-    def solve_challenge(self) -> None:
+    @abstractmethod
+    def do_action(self, *args) -> Any:
+        pass
+
+
+class XlsxHandler(Worker):
+    def __init__(self, driver: webdriver.Chrome):
+        self.driver = driver
+
+    def open_url(self):
         download_button_xpath = '//a[@href="./assets/downloadFiles/challenge.xlsx"]'
+        element = self.driver.find_element(By.XPATH, download_button_xpath)
+        element.click()
+        self.wait_for_data()
+
+    def do_action(self) -> List[Dict[str, str]] | None:
+        file_path = os.path.join(DOWNLOADS_DIR, DATA_FILE_NAME)
+        result_dict = None
+
+        try:
+            data = pd.ExcelFile(file_path)
+            df = data.parse(data.sheet_names[0])
+            df.columns = df.columns.str.strip()
+            result_dict = df.to_dict(orient='records')
+        except FileNotFoundError as e:
+            logger.info(e)
+
+        return result_dict
+
+    @staticmethod
+    def wait_for_data() -> None:
+        seconds = 0
+        timeout = 10
+        while not os.path.exists(os.path.join(DOWNLOADS_DIR, DATA_FILE_NAME)) and seconds < timeout:
+            time.sleep(1)
+            seconds += 1
+
+
+class FormFiller(Worker):
+    def __init__(self, driver: webdriver.Chrome):
+        self.driver = driver
+
+    def open_url(self):
         start_challenge_button_xpath = '//button[contains(@class, "btn")]'
-        submit_page_xpath = '//input[contains(@class, "btn")]'
+        element = self.driver.find_element(By.XPATH, start_challenge_button_xpath)
+        element.click()
 
-        self.make_click_on_specific_element(download_button_xpath, download_queue=True)
-        self.make_click_on_specific_element(start_challenge_button_xpath)
-        insertion_data = self.parse_excel(self.DOWNLOADS_DIR, self.DATA_FILE_NAME)
-
+    def do_action(self, insertion_data: List[Dict[str, str]], form_apply_count: int):
         if insertion_data is None:
             return
+
+        submit_page_xpath = '//input[contains(@class, "btn")]'
 
         input_mapping = {
             'Address': 'labelAddress',
@@ -48,11 +85,14 @@ class RPAParser:
             'Email': 'labelEmail'
         }
 
-        for user_data in insertion_data:
-            self.insert_data(user_data, input_mapping)
-            self.make_click_on_specific_element(submit_page_xpath)
+        for counter, user_data in enumerate(insertion_data, 1):
+            counter_check = self.apply_counter_check(counter, form_apply_count)
+            if counter_check == -1:
+                return
 
-        time.sleep(5)
+            self.insert_data(user_data, input_mapping)
+            element = self.driver.find_element(By.XPATH, submit_page_xpath)
+            element.click()
 
     def insert_data(self, user_data: Dict[str, str], input_mapping: Dict[str, str]):
         for attribute, value in user_data.items():
@@ -60,39 +100,39 @@ class RPAParser:
             input_element = self.driver.find_element(By.XPATH, user_data_element_xpath)
             input_element.send_keys(value)
 
-    def downloads_path_checker(self) -> str:
-        project_path = os.path.dirname(os.path.abspath(__file__))
-        downloads_folder = os.path.join(project_path, self.DOWNLOADS_DIR)
-
-        existing_file_path = os.path.join(downloads_folder, self.DATA_FILE_NAME)
-        if os.path.exists(existing_file_path):
-            os.remove(existing_file_path)
-
-        return downloads_folder
-
-    def wait_for_data(self) -> None:
-        while not os.path.exists(os.path.join(self.DOWNLOADS_DIR, self.DATA_FILE_NAME)):
-            time.sleep(1)
-
     @staticmethod
-    def parse_excel(dirname: str, filename: str) -> List[Dict[str, str]] | None:
-        file_path = os.path.join(dirname, filename)
-        result_dict = None
+    def apply_counter_check(loop_counter: int, form_apply_count: int):
+        if form_apply_count < 1 or loop_counter > form_apply_count:
+            time.sleep(5)
+            print(f'Form was filled successfully {form_apply_count} time (s)!')
+            return -1
 
-        try:
-            data = pd.ExcelFile(file_path)
-            df = data.parse(data.sheet_names[0])
-            df.columns = df.columns.str.strip()
-            result_dict = df.to_dict(orient='records')
-        except FileNotFoundError:
-            print('Could not find the data file. Check the download path and try again.')
 
-        return result_dict
+def downloads_path_checker() -> str:
+    project_path = os.path.dirname(os.path.abspath(__file__))
+    downloads_folder = os.path.join(project_path, DOWNLOADS_DIR)
+
+    existing_file_path = os.path.join(downloads_folder, DATA_FILE_NAME)
+    if os.path.exists(existing_file_path):
+        os.remove(existing_file_path)
+
+    return downloads_folder
 
 
 def main():
-    challenge_solver = RPAParser()
-    challenge_solver.solve_challenge()
+    chrome_options = webdriver.ChromeOptions()
+    prefs = {'download.default_directory': downloads_path_checker()}
+    chrome_options.add_experimental_option('prefs', prefs)
+    driver = webdriver.Chrome(options=chrome_options)
+    driver.get(PARSE_URL)
+
+    xlsx_worker = XlsxHandler(driver)
+    xlsx_worker.open_url()
+    data = xlsx_worker.do_action()
+
+    form_worker = FormFiller(driver)
+    form_worker.open_url()
+    form_worker.do_action(data, 1)
 
 
 if __name__ == '__main__':
