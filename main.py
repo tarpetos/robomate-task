@@ -86,8 +86,8 @@ class FormFiller(Worker):
         }
 
         for counter, user_data in enumerate(insertion_data, 1):
-            counter_check = self.apply_counter_check(counter, form_apply_count)
-            if counter_check == -1:
+            counter_check = self.apply_counter_check(counter, form_apply_count, len(insertion_data))
+            if counter_check != 0:
                 return
 
             self.insert_data(user_data, input_mapping)
@@ -101,11 +101,17 @@ class FormFiller(Worker):
             input_element.send_keys(value)
 
     @staticmethod
-    def apply_counter_check(loop_counter: int, form_apply_count: int):
-        if form_apply_count < 1 or loop_counter > form_apply_count:
-            time.sleep(5)
-            print(f'Form was filled successfully {form_apply_count} time (s)!')
+    def apply_counter_check(loop_counter: int, form_apply_count: int, max_counter_value: int) -> int:
+        if form_apply_count < 0 or form_apply_count > max_counter_value:
+            # time.sleep(5)
+            print(f'Form cannot be filled. Invalid input!')
             return -1
+        elif form_apply_count == loop_counter - 1:
+            # time.sleep(5)
+            print(f'Form was filled successfully {loop_counter - 1} time (s)!')
+            return -2
+        else:
+            return 0
 
 
 def downloads_path_checker() -> str:
@@ -132,7 +138,7 @@ def main():
 
     form_worker = FormFiller(driver)
     form_worker.open_url()
-    form_worker.do_action(data, 1)
+    form_worker.do_action(data, 5)
 
 
 if __name__ == '__main__':
