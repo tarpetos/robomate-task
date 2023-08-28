@@ -142,7 +142,7 @@ def test_xlsx_handler_open_url(driver, xlsx_handler):
 
 def test_xlsx_handler_do_action_success(insertion_data):
     xlsx_handler = XlsxHandler(
-        downloads_dir="tests/", data_file_name="test_challenge.xlsx"
+        downloads_dir="tests/test_data", data_file_name="test_challenge.xlsx"
     )
     actual_result = xlsx_handler.do_action()
     expected_result = insertion_data
@@ -152,7 +152,7 @@ def test_xlsx_handler_do_action_success(insertion_data):
 def test_xlsx_handler_do_action_fail():
     with pytest.raises(FileNotFoundError):
         xlsx_handler = XlsxHandler(
-            downloads_dir="tests/", data_file_name="fake_test_challenge.xlsx"
+            downloads_dir="tests/test_data", data_file_name="fake_test_challenge.xlsx"
         )
         xlsx_handler.do_action()
 
@@ -200,8 +200,9 @@ def test_runner_run(driver, runner):
 
 def test_downloads_path_checker():
     project_path = os.path.dirname(os.path.abspath("tests"))
-    expected_result = os.path.join(project_path, "tests")
+    expected_result = os.path.join(project_path, "tests", "test_data")
     actual_result = downloads_path_checker(
-        downloads_dir="tests", data_file_name="test_remove_challenge.xlsx"
+        downloads_dir=os.path.join("tests", "test_data"),
+        data_file_name="test_remove_challenge.xlsx",
     )
     assert actual_result == expected_result
