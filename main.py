@@ -82,6 +82,7 @@ class FormFiller(Worker):
             if counter_check is None:
                 return
 
+            logger.info('Inserting data for the %d worker...', counter)
             self.insert_data(user_data, self.input_mapping, driver)
             element = driver.find_element(By.XPATH, submit_page_xpath)
             element.click()
@@ -98,7 +99,7 @@ class FormFiller(Worker):
         if form_apply_count < 0 or form_apply_count > max_counter_value:
             logger.info(msg='Form cannot be filled. Invalid input!')
         elif form_apply_count == loop_counter - 1:
-            logger.info(msg=f'Form was filled successfully {loop_counter - 1} time (s)!')
+            logger.info('Form was filled successfully %d time (s)!', loop_counter - 1)
         else:
             return 'Loop continues'
 
