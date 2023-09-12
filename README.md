@@ -20,7 +20,7 @@ This program automates the solution for the RPA Challenge using the Selenium Web
 
 1. **Clone the repository or download the source code.**
 
-2. **Install the required dependencies using pip:** ```pip install requirements.txt```
+2. **Install the required dependencies using pip:** ```pip install -r requirements.txt```
 
 ## Usage
 
